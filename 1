@@ -1,0 +1,45 @@
+#!/usr/bin/env groovy
+properties([
+    parameters([
+        choice(choices: ['stg-config','iwt-config'], description: 'Which Environment?', name: 'EKSCONFIG'),
+        string(defaultValue: "stg", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
+        choice(choices: ['i1', 'i2'], description: 'Instance name of oauth', name: 'SERVICE_INSTANCE_NAME'),
+        string(defaultValue: "1", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'DEPLOYMENT_REPLICAS'),
+        [$class: 'ChoiceParameter', choiceType: 'PT_SINGLE_SELECT', description: 'Select Docker Image Tag to deploy.', name: 'IMAGETAG', script: [$class: 'GroovyScript', script: [script: '''def choices=[]
+            textFile= new File("/var/lib/jenkins/workspace/CD/ctx-oauth-CD/DOCKER_TAGS")
+            textFile.eachLine{
+            choices.add(it)
+            }
+            return choices''']]]
+])
+])
+try
+{
+    node('master'){
+        stage('Clone Gitlab CD repo'){
+            cleanWs()
+            checkout([$class: 'GitSCM', branches: [[name: '*/master']], userRemoteConfigs: [[credentialsId: 'gitlab-admin',url: 'https://gitlab.ctx.com.sg/cd/staging.git']]])
+        }
+
+        stage('Deploy on STG K8s') {
+            sh "sed -i 's|DEPLOYMENT_REPLICAS|${DEPLOYMENT_REPLICAS}|g' ctx-oauth/*.yaml"
+            sh "sed -i 's|TAG|${IMAGETAG}|g' ctx-oauth/*.yaml"
+            sh "sed -i 's|SERVICE_INSTANCE_NAME|${SERVICE_INSTANCE_NAME}|g' ctx-oauth/*.yaml"
+            if ( "${EKSCONFIG}" == 'iwt-config'){
+                sh "sed -i 's|stg|iwt|g' ctx-oauth/*.yaml"
+            }
+
+            withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/${EKSCONFIG}"]){
+                echo "Deploying Docker Tag ${IMAGETAG} for stg-ctx-oauth ..."
+                sh "kubectl apply -f ctx-oauth"
+            }
+
+            currentBuild.displayName = "${IMAGETAG} ($EKSCONFIG)"
+        }
+    }
+
+}
+catch (err){
+  currentBuild.result = "FAILURE"
+  throw err
+}
