@@ -1,0 +1,12 @@
+server:
+  port: 28001
+
+spring:
+  # profiles:
+  #  active: aws
+  application:
+    name: Quantification
+
+logging:
+  level:
+    root: INFO
