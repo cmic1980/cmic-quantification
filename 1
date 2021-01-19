@@ -22,10 +22,10 @@ try
 
         stage('Deploy on STG K8s') {
             sh "sed -i 's|DEPLOYMENT_REPLICAS|${DEPLOYMENT_REPLICAS}|g' oauth/*.yaml"
-            sh "sed -i 's|TAG|${IMAGETAG}|g' ctx-oauth/*.yaml"
+            sh "sed -i 's|TAG|${IMAGETAG}|g' oauth/*.yaml"
             sh "sed -i 's|SERVICE_INSTANCE_NAME|${SERVICE_INSTANCE_NAME}|g' oauth/*.yaml"
             if ( "${EKSCONFIG}" == 'iwt-config'){
-                sh "sed -i 's|stg|iwt|g' ctx-oauth/*.yaml"
+                sh "sed -i 's|stg|iwt|g' oauth/*.yaml"
             }
 
             withEnv(["KUBECONFIG=${JENKINS_HOME}/.kube/${EKSCONFIG}"]){
